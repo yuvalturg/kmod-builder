@@ -2,6 +2,6 @@
 
 docker build .
 
-docker run -v $path-to-outdir:/srv $image -c $kconfig-value
+docker run -v $PATH_TO_OUTDIR:/srv $IMAGE -c $KCONFIG_VALUE
 
-docker run -v $path-to-outdir>:/srv $image -c $config-value -v $kernel-uname-r
+docker run -v $PATH_TO_OUTDIR:/srv $IMAGE -c $KCONFIG_VALUE -v $KERNEL_UNAME_R
