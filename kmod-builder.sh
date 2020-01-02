@@ -20,7 +20,7 @@ build_kernel_module() {
     kmodpath=${kmodpath/.\//}
     ./scripts/config --module ${kconf}
     sed -i "s/^EXTRAVERSION.*/EXTRAVERSION=-${kver#*-}/" Makefile
-    make oldconfig
+    make olddefconfig
     make modules_prepare
     make M=${kmodpath}
     popd > /dev/null
@@ -114,14 +114,38 @@ build_fc_module() {
 }
 
 
+build_vanilla_module() {
+    local tmpdir="$1"
+    local kver="$2"
+    local kconf="$3"
+    local dotconfig="$4"
+
+    pushd ${tmpdir} > /dev/null
+    tarball="linux-${kver%%-*}.tar.xz"
+    url="https://cdn.kernel.org/pub/linux/kernel/v${kver:0:1}.x/${tarball}"
+    echo "Downloading ${url}"
+    curl -LO# "${url}"
+    mkdir -p build/kernel
+    tar -C build/kernel -xf ${tarball}
+    cp ${dotconfig} dev/.config
+    popd > /dev/null
+
+    build_kernel_module "${tmpdir}" "${kver}" "${kconf}"
+}
+
+
 main() {
     local kver
     local kconf
     local outdir
+    local dotconfig
 
-    while getopts "v:c:o:" OPTION
+    while getopts "d:v:c:o:" OPTION
     do
         case ${OPTION} in
+            d)
+                dotconfig=${OPTARG}
+                ;;
             v)
                 kver=${OPTARG}
                 ;;
@@ -135,14 +159,18 @@ main() {
     done
 
     kver=${kver:-$(uname -r)}  # default kernel version
-    dist=$(awk -F. '{print $(NF-1)}' <<< ${kver})
 
     echo "Building ${kconf} for kernel ${kver}"
 
     tmpdir=$(mktemp -d)
     mkdir -p ${tmpdir}/{src,dev,build} ${outdir}
 
-    build_${dist%%[0-9]*}_module "${tmpdir}" "${kver}" "${kconf}"
+    if [[ -n ${dotconfig} ]]; then
+        build_vanilla_module "${tmpdir}" "${kver}" "${kconf}" "${dotconfig}"
+    else
+        dist=$(awk -F. '{print $(NF-1)}' <<< ${kver})
+        build_${dist%%[0-9]*}_module "${tmpdir}" "${kver}" "${kconf}"
+    fi
 
     find ${tmpdir}/build -name "*.ko" -exec cp -v {} ${outdir} \;
     rm -rf ${tmpdir}
