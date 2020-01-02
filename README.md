@@ -1,12 +1,14 @@
 # kmod-builder
 
+### Usage:
+
 docker build .
 
 docker run -v $PATH_TO_OUTDIR:/srv $IMAGE -c $KCONFIG_VALUE
 
 docker run -v $PATH_TO_OUTDIR:/srv $IMAGE -c $KCONFIG_VALUE -v $KERNEL_UNAME_R
 
-Examples:
+### Examples:
 
 Building for a specific distro (Fedora/CentOS only) kernel:
 
