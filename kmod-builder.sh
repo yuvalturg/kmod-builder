@@ -1,6 +1,5 @@
 #!/bin/bash -e
 
-
 build_kernel_module() {
     local tmpdir="$1"
     local kver="$2"
@@ -26,7 +25,6 @@ build_kernel_module() {
     popd > /dev/null
 }
 
-
 build_from_source_rpms() {
     local tmpdir="$1"
     local kver="$2"
@@ -44,7 +42,6 @@ build_from_source_rpms() {
 
     build_kernel_module "${tmpdir}" "${kver}" "${kconf}"
 }
-
 
 download_el_package() {
     local elver="$1"
@@ -64,7 +61,6 @@ download_el_package() {
             ;;
     esac
 }
-
 
 build_el_module() {
     local tmpdir="$1"
@@ -97,14 +93,15 @@ build_el_module() {
 }
 
 
-build_fc_module() {
+build_koji_module() {
     local tmpdir="$1"
     local kver="$2"
     local kconf="$3"
+    local profile="$4"
 
     pushd ${tmpdir} > /dev/null
-    koji -p fedora download-build --noprogress --rpm kernel-devel-${kver}
-    koji -p fedora download-build --noprogress --rpm kernel-${kver%.*}.src
+    koji -p ${profile} download-build --noprogress --rpm kernel-devel-${kver}
+    koji -p ${profile} download-build --noprogress --rpm kernel-${kver%.*}.src
 
     mv kernel-devel-${kver}.rpm kernel-dev.rpm
     mv kernel-${kver%.*}.src.rpm kernel-src.rpm
@@ -113,6 +110,13 @@ build_fc_module() {
     build_from_source_rpms "${tmpdir}" "${kver}" "${kconf}"
 }
 
+build_fc_module() {
+    local tmpdir="$1"
+    local kver="$2"
+    local kconf="$3"
+
+    build_koji_module "${tmpdir}" "${kver}" "${kconf}" "fedora"
+}
 
 build_vanilla_module() {
     local tmpdir="$1"
@@ -133,14 +137,14 @@ build_vanilla_module() {
     build_kernel_module "${tmpdir}" "${kver}" "${kconf}"
 }
 
-
 main() {
     local kver
     local kconf
     local outdir
+    local koji_profile
     local dotconfig
 
-    while getopts "d:v:c:o:" OPTION
+    while getopts "d:v:c:j:o:" OPTION
     do
         case ${OPTION} in
             d)
@@ -151,6 +155,9 @@ main() {
                 ;;
             c)
                 kconf=${OPTARG}
+                ;;
+            j)
+                koji_profile=${OPTARG}
                 ;;
             o)
                 outdir=${OPTARG}
@@ -168,8 +175,12 @@ main() {
     if [[ -n ${dotconfig} ]]; then
         build_vanilla_module "${tmpdir}" "${kver}" "${kconf}" "${dotconfig}"
     else
-        dist=$(awk -F. '{print $(NF-1)}' <<< ${kver})
-        build_${dist%%[0-9]*}_module "${tmpdir}" "${kver}" "${kconf}"
+        if [[ -n ${koji_profile} ]]; then
+            build_koji_module "${tmpdir}" "${kver}" "${kconf}" "${koji_profile}"
+        else
+            dist=$(awk -F. '{print $(NF-1)}' <<< ${kver})
+            build_${dist%%[0-9]*}_module "${tmpdir}" "${kver}" "${kconf}"
+        fi
     fi
 
     find ${tmpdir}/build -name "*.ko" -exec cp -v {} ${outdir} \;
